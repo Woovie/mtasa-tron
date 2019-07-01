@@ -1,0 +1,6 @@
+<meta>
+	<info author="Woovie" name="Tron" showInResourceBrowser="true"/>
+    <script src="server_main.lua" />
+    <script src="client_main.lua" type="client" />
+    <file src="lightcycle_trail.png" />
+</meta>
