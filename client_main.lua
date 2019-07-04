@@ -1,43 +1,44 @@
-local cycle_trail = dxCreateTexture("lightcycle_trail.png")
-local renderLines = {}
-local renderPoints = {}
-local rayCasts = {}
-local font = 'default'
-local fontHeight = dxGetFontHeight(1, font)
+local texture = dxCreateTexture("lightcycle_trail.png")
+local points = {}
+local rendering = true
+local inVehicle = false
 
 function clientRender()
-    for colShape, trailData in pairs(renderLines) do
-        dxDrawLine3D(trailData[1], trailData[2], trailData[3], trailData[4], trailData[5], trailData[6])
-    end
-    for key, positionMatrix in ipairs(renderPoints) do
-        local sx, sy = getScreenFromWorldPosition(positionMatrix)
-        if sx then
-            dxDrawCircle(sx, sy, 5, 0, 360, tocolor(255, 0, 0, 255))
+    if rendering then
+        for vehicle in pairs(points) do
+            for i=1,#points[vehicle]-1,1 do
+                local point1 = points[vehicle][i]
+                local point2 = points[vehicle][i+1]
+                local x, y, z = calculateMidpoint3D(point1[1], point1[2], point1[3], point2[1], point2[2], point2[3])
+                local rx, ry, rz = findRotation3D(point1[1], point1[2], point1[3], point2[1], point2[2], point2[3])
+                local matrix = Matrix(Vector3(x, y, z), Vector3(rx, ry, rz))
+                local facing = matrix:getPosition() + matrix:getRight()
+                local color = tocolor(255, 0, 0, 255)--Temporary, need to alter points array and store the color per vehicle
+                dxDrawMaterialLine3D(point1[1], point1[2], point1[3], point2[1], point2[2], point2[3], texture, 2, color, false, facing.x, facing.y, facing.z)
+            end
         end
+    end
+    if inVehicle and points[inVehicle] then
+        local pointData = points[inVehicle][#points[inVehicle]]
+        local x1, y1, z1 = pointData[1], pointData[2], pointData[3]
+        local x2, y2, z2 = getElementPosition(inVehicle)
+        local dist = getDistanceBetweenPoints3D(x1, y1, z1, x2, y2, z2)
+        if dist > 2 and dist < 5 then
+            storeLine(inVehicle, {x2, y2, z2})
+        end
+    elseif inVehicle and not points[inVehicle] then
+        local x2, y2, z2 = getElementPosition(inVehicle)
+        points[inVehicle] = {{x2, y2, z2}}
     end
 end
 
-
-function createTrail(colShape, trailData)
-    local x, y, z = calculateMidpoint3D(trailData[1], trailData[2], trailData[3], trailData[4], trailData[5], trailData[6])
-    local rx, ry, rz = findRotation3D(trailData[1], trailData[2], trailData[3], trailData[4], trailData[5], trailData[6])
-    local lineLength = getDistanceBetweenPoints3D(trailData[1], trailData[2], trailData[3], trailData[4], trailData[5], trailData[6])
-    local startPointMatrix = Matrix(Vector3(trailData[1], trailData[2], trailData[3]), Vector3(rx, ry, rz))
-    local belowStart = startPointMatrix:transformPosition(Vector3(0, 0, -1))
-    local aboveStart = startPointMatrix:transformPosition(Vector3(0, 0, 1))
-    local endPointMatrix = Matrix(Vector3(trailData[4], trailData[5], trailData[6]), Vector3(rx, ry, rz))
-    local belowEnd = endPointMatrix:transformPosition(Vector3(0, 0, -1))
-    local aboveEnd = endPointMatrix:transformPosition(Vector3(0, 0, 1))
-    local slopeMatrix = Matrix(Vector3(x, y, z), Vector3(rx, ry, rz))
-    local belowSlope = slopeMatrix:transformPosition(Vector3(0, 0, -1))
-    local aboveSlope = slopeMatrix:transformPosition(Vector3(0, 0, 1))
-    --Lines
-    table.insert(renderLines, trailData)
-    table.insert(renderLines, {aboveStart.x, aboveStart.y, aboveStart.z, aboveEnd.x, aboveEnd.y, aboveEnd.z})
-    table.insert(renderLines, {belowStart.x, belowStart.y, belowStart.z, belowEnd.x, belowEnd.y, belowEnd.z})
-    --Points
-    table.insert(renderPoints, belowSlope)
-    table.insert(renderPoints, aboveSlope)
+function storeLine(vehicle, pointData)
+    if #points[vehicle] == 25 then
+        table.remove(points[vehicle], 1)
+        table.insert(points[vehicle], pointData)
+    else
+        table.insert(points[vehicle], pointData)
+    end
 end
 
 function findRotation3D( x1, y1, z1, x2, y2, z2 ) 
@@ -56,31 +57,8 @@ function calculateMidpoint3D(x, y, z, x2, y2, z2)
     return (x+x2)/2, (y+y2)/2, (z+z2)/2
 end
 
-
-addEvent("createTrail", true)
+addEventHandler("onClientVehicleEnter", root, function(player, seat)if player == localPlayer then inVehicle = getPedOccupiedVehicle(localPlayer)end end)
+addEventHandler("onClientVehicleExit", root, function()inVehicle = false end)
 
 addEventHandler("onClientRender", root, clientRender)
-addEventHandler("createTrail", root, createTrail)
-
 addCommandHandler("devmode",function()setDevelopmentMode(true)end)
-
-function dump(o)
-    if type(o) == 'table' then
-       local s = '{ '
-       for k,v in pairs(o) do
-          if type(k) ~= 'number' then k = '"'..k..'"' end
-          s = s .. '['..k..'] = ' .. dump(v) .. ','
-       end
-       return s .. '} '
-    else
-       return tostring(o)
-    end
- end
-
-function tableFind(table, element)
-    for index, value in pairs(table) do
-        if value == element then
-            return index
-        end
-    end
- end
