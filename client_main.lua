@@ -2,6 +2,7 @@ local texture = dxCreateTexture("lightcycle_trail.png")
 local points = {}
 local rendering = true
 local inVehicle = false
+local debug = true
 
 function clientRender()
     if rendering then
@@ -14,7 +15,33 @@ function clientRender()
                 local matrix = Matrix(Vector3(x, y, z), Vector3(rx, ry, rz))
                 local facing = matrix:getPosition() + matrix:getRight()
                 local color = tocolor(255, 0, 0, 255)--Temporary, need to alter points array and store the color per vehicle
+                local point1Matrix = Matrix(Vector3(point1[1], point1[2], point1[3]), Vector3(rx, ry, rz))
+                local point2Matrix = Matrix(Vector3(point2[1], point2[2], point2[3]), Vector3(rx, ry, rz))
+                local point1Above = point1Matrix:transformPosition(Vector3(0, 0, 1))
+                local point1Below = point1Matrix:transformPosition(Vector3(0, 0, -1))
+                local point2Above = point2Matrix:transformPosition(Vector3(0, 0, 1))
+                local point2Below = point2Matrix:transformPosition(Vector3(0, 0, -1))
+                local hitAbove, hitXAbove, hitYAbove, hitZAbove, hitElementAbove = processLineOfSight(point1Above, point2Above)
+                local hitMiddle, hitXMiddle, hitYMiddle, hitZMiddle, hitElementMiddle = processLineOfSight(point1Matrix:getPosition(), point2Matrix:getPosition())
+                local hitBelow, hitXBelow, hitYBelow, hitZBelow, hitElementBelow = processLineOfSight(point1Below, point2Below)
                 dxDrawMaterialLine3D(point1[1], point1[2], point1[3], point2[1], point2[2], point2[3], texture, 2, color, false, facing.x, facing.y, facing.z)
+                if debug then
+                    local hitAboveColor = tocolor(0, 0, 255, 255)
+                    local hitMiddleColor = tocolor(0, 0, 255, 255)
+                    local hitBelowColor = tocolor(0, 0, 255, 255)
+                    if hitAbove then
+                        hitAboveColor = tocolor(0, 255, 0, 255)
+                    end
+                    if hitMiddle then
+                        hitMiddleColor = tocolor(0, 255, 0, 255)
+                    end
+                    if hitBelow then
+                        hitBelowColor = tocolor(0, 255, 0, 255)
+                    end
+                    dxDrawLine3D(point1Above.x, point1Above.y, point1Above.z, point2Above.x, point2Above.y, point2Above.z, hitAboveColor)
+                    dxDrawLine3D(point1Matrix:getPosition(), point2Matrix:getPosition(), hitMiddleColor)
+                    dxDrawLine3D(point1Below.x, point1Below.y, point1Below.z, point2Below.x, point2Below.y, point2Below.z, hitBelowColor)
+                end
             end
         end
     end
@@ -23,7 +50,7 @@ function clientRender()
         local x1, y1, z1 = pointData[1], pointData[2], pointData[3]
         local x2, y2, z2 = getElementPosition(inVehicle)
         local dist = getDistanceBetweenPoints3D(x1, y1, z1, x2, y2, z2)
-        if dist > 2 and dist < 5 then
+        if dist > 0.1 and dist < 4 then
             storeLine(inVehicle, {x2, y2, z2})
         end
     elseif inVehicle and not points[inVehicle] then
@@ -33,7 +60,7 @@ function clientRender()
 end
 
 function storeLine(vehicle, pointData)
-    if #points[vehicle] == 25 then
+    if #points[vehicle] == 200 then
         table.remove(points[vehicle], 1)
         table.insert(points[vehicle], pointData)
     else
